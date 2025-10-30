@@ -1,5 +1,5 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import {Request, Response } from "express";
+import { Request, Response } from "express";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import dotenv from "dotenv";
@@ -32,7 +32,10 @@ export const askQuestion = async (req: Request, res: Response) => {
     if (conversationId) {
       conversation = await conversationModel.findById(conversationId);
     } else {
-      conversation = await conversationModel.create({ userId: user._id });
+      conversation = await conversationModel.create({
+        userId: user._id,
+        title: message.slice(0, 30) + (message.length > 30 ? "..." : ""),
+      });
     }
 
     if (!conversation) {
@@ -90,6 +93,33 @@ Assistant:
     });
   } catch (error) {
     console.error("Error in generating answer:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};
+
+export const getMessages = async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.query;
+
+    if (!conversationId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "conversationId required" });
+    }
+
+    const messages = await messageModel
+      .find({ conversationId })
+      .sort({ createdAt: 1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Fetched messages successfully",
+      messages,
+    });
+  } catch (error) {
+    console.error("Error in getMessages controller:", error);
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });

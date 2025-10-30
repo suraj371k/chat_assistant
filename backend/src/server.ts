@@ -2,12 +2,12 @@ import express, { type Request, type Response } from 'express';
 import dotenv from 'dotenv'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
-import connectDB from './config/db';
+import connectDB from './config/db.js';
 
 //routes imports
-import userRoutes from './routes/user.routes'
-import messageRoutes from './routes/message.routes'
-import conversationRoutes from './routes/conversation.routes'
+import  userRoutes from './routes/user.routes.js'
+import messageRoutes from './routes/message.routes.js'
+import conversationRoutes from './routes/conversation.routes.js'
 
 
 dotenv.config()
