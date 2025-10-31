@@ -3,7 +3,6 @@ import { Request, Response } from "express";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
-  PromptTemplate,
 } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import dotenv from "dotenv";
@@ -61,7 +60,7 @@ export const askQuestion = async (req: Request, res: Response) => {
       );
     }
 
-    // ✅ Fetch previous messages and convert to LangChain format
+    //Fetch previous messages and convert to LangChain format
     const prevMessages = await messageModel
       .find({ conversationId: conversation._id })
       .sort({ createdAt: 1 })
@@ -74,7 +73,7 @@ export const askQuestion = async (req: Request, res: Response) => {
         : new AIMessage(msg.content)
     );
 
-    // ✅ Use ChatPromptTemplate with message history
+    // Use ChatPromptTemplate with message history
     const prompt = ChatPromptTemplate.fromMessages([
       [
         "system",

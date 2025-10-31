@@ -5,6 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2, ArrowDown } from "lucide-react";
 import { useChatStore } from "@/store/chatStore";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 const Chat = () => {
   const { messages, loading, error, sendMessage } = useChatStore();
@@ -43,16 +47,6 @@ const Chat = () => {
     await sendMessage(userInput);
   };
 
-  // Format message content with markdown-like rendering
-  const formatMessage = (content: string) => {
-    return content.split("\n").map((line, i) => (
-      <span key={i}>
-        {line}
-        {i < content.split("\n").length - 1 && <br />}
-      </span>
-    ));
-  };
-
   return (
     <div className="flex flex-col w-full h-screen relative bg-black">
       {/* Chat Messages */}
@@ -70,8 +64,7 @@ const Chat = () => {
               How can I help you today?
             </h2>
             <p className="text-gray-400 text-sm max-w-md text-center">
-              Ask me anything - from coding help to creative ideas, I'm here to
-              assist you.
+              Ask me anything - from coding help to creative ideas, I'm here to assist you.
             </p>
           </div>
         )}
@@ -104,9 +97,153 @@ const Chat = () => {
                 {msg.role === "user" ? "You" : "AI Assistant"}
               </div>
 
-              {/* Message content */}
-              <div className="whitespace-pre-wrap wrap-break-word text-[15px] leading-relaxed">
-                {formatMessage(msg.content)}
+              {/* Message content with Markdown */}
+              <div className="prose prose-invert prose-sm max-w-none">
+                {msg.role === "user" ? (
+                  // User messages: simple text
+                  <div className="whitespace-pre-wrap wrap-break-word text-[15px] leading-relaxed">
+                    {msg.content}
+                  </div>
+                ) : (
+                  // AI messages: render markdown
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Customize code blocks
+                      code({ node, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        // The <code> tag doesn't pass the "inline" prop by default, instead test className for block.
+                        const isInline = !className;
+                        return !isInline && match ? (
+                          <SyntaxHighlighter
+                            style={vscDarkPlus as any}
+                            language={match[1]}
+                            PreTag="div"
+                            className="rounded-lg my-2"
+                            {...props}
+                          >
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code
+                            className="bg-gray-800 px-1.5 py-0.5 rounded text-emerald-400 text-sm"
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      },
+                      // Style paragraphs
+                      p({ children }) {
+                        return (
+                          <p className="mb-2 last:mb-0 text-[15px] leading-relaxed">
+                            {children}
+                          </p>
+                        );
+                      },
+                      // Style lists
+                      ul({ children }) {
+                        return (
+                          <ul className="list-disc list-inside space-y-1 my-2">
+                            {children}
+                          </ul>
+                        );
+                      },
+                      ol({ children }) {
+                        return (
+                          <ol className="list-decimal list-inside space-y-1 my-2">
+                            {children}
+                          </ol>
+                        );
+                      },
+                      // Style list items
+                      li({ children }) {
+                        return <li className="text-gray-200">{children}</li>;
+                      },
+                      // Style links
+                      a({ href, children }) {
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 underline"
+                          >
+                            {children}
+                          </a>
+                        );
+                      },
+                      // Style headings
+                      h1({ children }) {
+                        return (
+                          <h1 className="text-xl font-bold mb-2 text-white">
+                            {children}
+                          </h1>
+                        );
+                      },
+                      h2({ children }) {
+                        return (
+                          <h2 className="text-lg font-bold mb-2 text-white">
+                            {children}
+                          </h2>
+                        );
+                      },
+                      h3({ children }) {
+                        return (
+                          <h3 className="text-base font-bold mb-2 text-white">
+                            {children}
+                          </h3>
+                        );
+                      },
+                      // Style blockquotes
+                      blockquote({ children }) {
+                        return (
+                          <blockquote className="border-l-4 border-gray-600 pl-4 italic text-gray-300 my-2">
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      // Style tables
+                      table({ children }) {
+                        return (
+                          <div className="overflow-x-auto my-2">
+                            <table className="min-w-full border border-gray-700 rounded-lg">
+                              {children}
+                            </table>
+                          </div>
+                        );
+                      },
+                      th({ children }) {
+                        return (
+                          <th className="border border-gray-700 px-4 py-2 bg-gray-800 font-bold text-left">
+                            {children}
+                          </th>
+                        );
+                      },
+                      td({ children }) {
+                        return (
+                          <td className="border border-gray-700 px-4 py-2">
+                            {children}
+                          </td>
+                        );
+                      },
+                      // Style strong/bold
+                      strong({ children }) {
+                        return (
+                          <strong className="font-bold text-white">
+                            {children}
+                          </strong>
+                        );
+                      },
+                      // Style em/italic
+                      em({ children }) {
+                        return <em className="italic text-gray-200">{children}</em>;
+                      },
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
               </div>
 
               {/* Streaming indicator for last assistant message */}

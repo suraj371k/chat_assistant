@@ -8,14 +8,21 @@ interface Message {
   content: string;
 }
 
+interface Conversation {
+    _id: string;
+    title: string
+}
+
 interface ChatState {
   messages: Message[];
   conversationId: string | null;
+  conversations: Conversation[];
   loading: boolean;
   error: string | null;
 
   sendMessage: (message: string) => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
+  getConversations: () => Promise<void>;
   resetChat: () => void;
 }
 
@@ -24,8 +31,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   conversationId: null,
   loading: false,
   error: null,
+  conversations: [],
 
-  // ✅ Streaming sendMessage (ChatGPT-like)
+  // Streaming sendMessage (ChatGPT-like)
   sendMessage: async (message: string) => {
     const { conversationId, messages } = get();
 
@@ -65,7 +73,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const chunk = decoder.decode(value, { stream: true });
 
         // SSE data may contain multiple lines
-        const lines = chunk.split("\n").filter((line) => line.trim().startsWith("data:"));
+        const lines = chunk
+          .split("\n")
+          .filter((line) => line.trim().startsWith("data:"));
         for (const line of lines) {
           const data = line.replace("data:", "").trim();
 
@@ -110,9 +120,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
-      const res = await fetch(`${backendUrl}/api/messages?conversationId=${conversationId}`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `${backendUrl}/api/messages?conversationId=${conversationId}`,
+        {
+          credentials: "include",
+        }
+      );
 
       const data = await res.json();
 
@@ -130,6 +143,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
 
-  // ✅ Reset chat
+  //get all conversations
+  getConversations: async () => {
+    try {
+      set({ loading: true, error: null });
+      const res = await axios.get(`${backendUrl}/api/conversation` , {withCredentials: true});
+      set({ conversations: res.data.conversations, loading: false });
+    } catch (err: any) {
+      console.error("Error fetching messages:", err);
+      set({
+        loading: false,
+        error: err.message || "Failed to fetch messages",
+      });
+    }
+  },
+
+  // Reset chat
   resetChat: () => set({ messages: [], conversationId: null, error: null }),
 }));
