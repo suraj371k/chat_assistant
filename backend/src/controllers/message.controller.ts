@@ -1,79 +1,107 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { Request, Response } from "express";
-import { PromptTemplate } from "@langchain/core/prompts";
+import {
+  ChatPromptTemplate,
+  MessagesPlaceholder,
+  PromptTemplate,
+} from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import dotenv from "dotenv";
 import conversationModel from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 dotenv.config();
 
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-2.0-flash",
-  maxOutputTokens: 2028,
+  maxOutputTokens: 2048,
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
 export const askQuestion = async (req: Request, res: Response) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
   try {
     const { message, conversationId } = req.body;
     const user = req.user;
 
-    if (!user)
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!user) {
+      res.write(`data: ${JSON.stringify({ error: "Unauthorized" })}\n\n`);
+      return res.end();
+    }
 
-    if (!message)
-      return res
-        .status(400)
-        .json({ success: false, message: "Message is required" });
+    if (!message) {
+      res.write(
+        `data: ${JSON.stringify({ error: "Message is required" })}\n\n`
+      );
+      return res.end();
+    }
 
     let conversation;
 
     if (conversationId) {
       conversation = await conversationModel.findById(conversationId);
+      if (!conversation) {
+        res.write(
+          `data: ${JSON.stringify({ error: "Conversation not found" })}\n\n`
+        );
+        return res.end();
+      }
     } else {
       conversation = await conversationModel.create({
         userId: user._id,
         title: message.slice(0, 30) + (message.length > 30 ? "..." : ""),
       });
+      res.write(
+        `data: ${JSON.stringify({ conversationId: conversation._id })}\n\n`
+      );
     }
 
-    if (!conversation) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Conversation not found" });
-    }
-
-    // fetch last messages
+    // ✅ Fetch previous messages and convert to LangChain format
     const prevMessages = await messageModel
       .find({ conversationId: conversation._id })
       .sort({ createdAt: 1 })
-      .limit(15);
+      .limit(20);
 
-    const history = prevMessages
-      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-      .join("\n");
+    // Convert to LangChain message format
+    const chatHistory = prevMessages.map((msg) =>
+      msg.role === "user"
+        ? new HumanMessage(msg.content)
+        : new AIMessage(msg.content)
+    );
 
-    // 🧠 Personalize the AI with user data
-    const userIntro = `The user chatting with you is named ${user.name}. Their email is ${user.email}. Use this info naturally if needed.`;
-
-    const prompt = PromptTemplate.fromTemplate(`
-You are a helpful AI assistant. Use the context to answer naturally.
-
-${userIntro}
-
-Here is the chat so far:
-${history}
-
-User: {question}
-Assistant:
-`);
+    // ✅ Use ChatPromptTemplate with message history
+    const prompt = ChatPromptTemplate.fromMessages([
+      [
+        "system",
+        `You are a helpful AI assistant. The user's name is ${user.name} and their email is ${user.email}. 
+Use this information naturally when relevant. Always maintain context from previous messages in the conversation.`,
+      ],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "{input}"],
+    ]);
 
     const chain = prompt.pipe(model).pipe(new StringOutputParser());
-    const response = await chain.invoke({ question: message });
 
-    // save user + assistant messages
-    await messageModel.create([
+    let fullResponse = "";
+
+    // Stream with proper message history
+    const stream = await chain.stream({
+      chat_history: chatHistory,
+      input: message,
+    });
+
+    for await (const chunk of stream) {
+      fullResponse += chunk;
+      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+
+    // Save messages
+    await messageModel.insertMany([
       {
         conversationId: conversation._id,
         role: "user",
@@ -82,20 +110,18 @@ Assistant:
       {
         conversationId: conversation._id,
         role: "assistant",
-        content: response,
+        content: fullResponse,
       },
     ]);
 
-    return res.status(200).json({
-      success: true,
-      conversationId: conversation._id,
-      message: response,
-    });
+    res.write(`data: [DONE]\n\n`);
+    res.end();
   } catch (error) {
     console.error("Error in generating answer:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
+    res.write(
+      `data: ${JSON.stringify({ error: "Internal server error" })}\n\n`
+    );
+    res.end();
   }
 };
 
