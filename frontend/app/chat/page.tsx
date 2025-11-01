@@ -114,20 +114,26 @@ const Chat = () => {
                         const match = /language-(\w+)/.exec(className || "");
                         // The <code> tag doesn't pass the "inline" prop by default, instead test className for block.
                         const isInline = !className;
+
+                        // ReactMarkdown forwards a `ref` in `props` (Ref<HTMLElement>),
+                        // which conflicts with the ref type expected by react-syntax-highlighter.
+                        // Destructure `ref` out so we don't pass it to SyntaxHighlighter.
+                        const { ref: _ref, ...rest } = props as any;
+
                         return !isInline && match ? (
                           <SyntaxHighlighter
                             style={vscDarkPlus as any}
                             language={match[1]}
                             PreTag="div"
                             className="rounded-lg my-2"
-                            {...props}
+                            {...rest}
                           >
                             {String(children).replace(/\n$/, "")}
                           </SyntaxHighlighter>
                         ) : (
                           <code
                             className="bg-gray-800 px-1.5 py-0.5 rounded text-emerald-400 text-sm"
-                            {...props}
+                            {...rest}
                           >
                             {children}
                           </code>
