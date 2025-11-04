@@ -22,7 +22,8 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  loading: false,
+  // start as loading=true so the app waits for getProfile on initial load
+  loading: true,
   error: null,
 
   // REGISTER
