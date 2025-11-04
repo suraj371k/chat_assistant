@@ -12,9 +12,11 @@ import conversationRoutes from "./routes/conversation.routes.js";
 dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
+// Determine allowed frontend origin via environment (use the deployed frontend URL in production)
+const CLIENT_URL = process.env.CLIENT_URL || "https://chat-assistant-liart.vercel.app";
 
 // Middleware
-app.use(cors({ origin: "https://chat-assistant-liart.vercel.app", credentials: true }));
+app.use(cors({ origin: CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 

@@ -59,8 +59,9 @@ export const loginUser = async (req: Request, res: Response) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 24 * 60 * 60 * 1000, 
-      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      // Allow cross-site cookie in production when frontend is on a different origin
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
     });
 
 
@@ -78,10 +79,11 @@ export const loginUser = async (req: Request, res: Response) => {
 // Logout Controller
 export const logoutUser = async (req: Request, res: Response) => {
   try {
+    // Clear cookie with sameSite matching how it was set
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
     });
     return res.status(200).json({
       success: true,
