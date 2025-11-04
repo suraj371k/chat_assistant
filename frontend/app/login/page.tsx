@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,8 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { login, loading, error } = useAuthStore();
+  const { login, loading, error, clearError, isAuthenticated } = useAuthStore();
+  const router = useRouter();
 
   const {
     register,
@@ -38,12 +39,40 @@ const Login = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  const router = useRouter();
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, router]);
+
+  // Clear error when component unmounts
+  useEffect(() => {
+    return () => {
+      clearError();
+    };
+  }, [clearError]);
 
   const onSubmit = async (data: LoginFormData) => {
-    await login(data.email, data.password);
-    toast.success("login successfully!");
-    router.push("/");
+    try {
+      // Clear any previous errors
+      clearError();
+
+      // Attempt login
+      const success = await login(data.email, data.password);
+
+      if (success) {
+        toast.success("Login successful!");
+        reset(); // Clear form
+        router.push("/"); // Redirect to home
+      } else {
+        // Error is already set in store, show it in toast
+        toast.error(error || "Login failed. Please try again.");
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+      console.error("Login error:", err);
+    }
   };
 
   return (
@@ -59,6 +88,13 @@ const Login = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Show backend error */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3">
+                <p className="text-red-400 text-sm text-center">{error}</p>
+              </div>
+            )}
+
             {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-gray-300">
@@ -69,7 +105,8 @@ const Login = () => {
                 type="email"
                 placeholder="you@example.com"
                 {...register("email")}
-                className="bg-neutral-900 border-neutral-800 text-white placeholder-gray-500"
+                className="bg-neutral-900 border-neutral-800 text-white placeholder-gray-500 focus:border-white"
+                disabled={loading}
               />
               {errors.email && (
                 <p className="text-red-500 text-sm">{errors.email.message}</p>
@@ -86,7 +123,8 @@ const Login = () => {
                 type="password"
                 placeholder="••••••••"
                 {...register("password")}
-                className="bg-neutral-900 border-neutral-800 text-white placeholder-gray-500"
+                className="bg-neutral-900 border-neutral-800 text-white placeholder-gray-500 focus:border-white"
+                disabled={loading}
               />
               {errors.password && (
                 <p className="text-red-500 text-sm">
@@ -97,9 +135,10 @@ const Login = () => {
 
             <Button
               type="submit"
-              className="w-full bg-white text-black hover:bg-gray-200 font-semibold"
+              className="w-full bg-white text-black hover:bg-gray-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
             >
-              {loading ? "login in.." : "Login"}
+              {loading ? "Logging in..." : "Login"}
             </Button>
 
             <p className="text-gray-500 text-sm text-center">
