@@ -35,9 +35,12 @@ export const registerUser = async (req: Request, res: Response) => {
 export const loginUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    // Debug log: show incoming login attempt (do not log password in production)
+    console.log(`Login attempt for email=${email} origin=${req.headers.origin} ip=${req.ip}`);
 
     const user = await userModel.findOne({ email });
     if (!user) {
+      console.log(`Login failed: user not found for email=${email}`);
       return res
         .status(400)
         .json({ success: false, message: "Invalid email or password" });
@@ -45,6 +48,7 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log(`Login failed: invalid password for email=${email}`);
       return res
         .status(400)
         .json({ success: false, message: "Invalid email or password" });
@@ -100,7 +104,9 @@ export const logoutUser = async (req: Request, res: Response) => {
 // Profile Controller
 export const getProfile = async (req: Request, res: Response) => {
   try {
+    console.log(`Profile request origin=${req.headers.origin} cookies=${JSON.stringify(req.cookies)}`);
     if (!req.user) {
+      console.log("Profile request: no req.user (unauthenticated)");
       return res.status(401).json({
         success: false,
         message: "Not authorized",
