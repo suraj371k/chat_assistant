@@ -15,8 +15,25 @@ const port = process.env.PORT || 5000;
 // Determine allowed frontend origin via environment (use the deployed frontend URL in production)
 const CLIENT_URL = process.env.CLIENT_URL || "https://chat-assistant-liart.vercel.app";
 
-// Middleware
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+// Allowlist common origins for local dev + production
+const allowedOrigins = [CLIENT_URL, "http://localhost:3000", "http://127.0.0.1:3000"];
+
+// Middleware: dynamically echo back the request origin if it's allowed.
+// This ensures Access-Control-Allow-Origin matches the exact origin (required for credentials).
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
