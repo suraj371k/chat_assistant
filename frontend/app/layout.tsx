@@ -1,7 +1,8 @@
-// app/layout.tsx
+"use client"
+import { useAuthStore } from "@/store/userStore";
+import "./globals.css";
 "use client";
 
-import { useAuthStore } from "@/store/userStore";
 import { useEffect } from "react";
 
 export default function RootLayout({
